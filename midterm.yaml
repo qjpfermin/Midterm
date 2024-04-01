@@ -1,0 +1,50 @@
+---
+- hosts: all
+  become: true
+  pre_tasks:
+
+- name: Setup the firewall on Ubuntu and CentOS
+  hosts: all
+  become: true
+  vars:
+    firewall_rules:
+      - { port: 22, protocol: tcp, state: present }
+      - { port: 80, protocol: tcp, state: present }
+      - { port: 443, protocol: tcp, state: present }
+
+  tasks:
+    - name: Installing necessary packages for Ubuntu
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Installing necessary packages for CentOS
+      ansible.builtin.yum:
+        name:
+          - firewalld
+          - https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm
+        state: present
+      when: ansible_distribution == "CentOS"
+
+    - name: Installing ufw for CentOS
+      ansible.builtin.yum:
+        name: ufw
+        state: present
+      when: ansible_distribution == "CentOS"
+
+    - name: Enabling the firewall in Ubuntu and CentOS
+      ansible.builtin.service:
+        name: "{{ firewall_service }}"
+        state: started
+        enabled: true
+      vars:
+        firewall_service: "{{ 'ufw' if ansible_distribution == 'Ubuntu' else 'firewalld' }}"
+
+    - name: Adding firewall rules in Ubuntu
+      ansible.builtin.ufw:
+        rule: allow
+        port: "{{ item.port }}"
+        protocol: "{{ item.protocol }}"
+      loop: "{{ firewall_rules }}"
+      when: ansible_distribution == "Ubuntu"
